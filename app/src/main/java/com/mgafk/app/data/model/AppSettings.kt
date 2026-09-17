@@ -91,6 +91,10 @@ data class AppSettings(
     // Shops
     val purchaseMode: PurchaseMode = PurchaseMode.BULK,
 
+    // Item keys ("shop:itemName", same shape as ShopAlertTracker.keyOf) the user
+    // wants bought automatically the moment they're in stock
+    val autoBuyItems: Set<String> = emptySet(),
+
     // Garden - where a seed or a potted plant lands when planted by hand
     val plantPlacementMode: PlantPlacementMode = PlantPlacementMode.FREE_TILE,
 
