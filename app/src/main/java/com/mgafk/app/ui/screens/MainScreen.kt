@@ -109,6 +109,8 @@ import com.mgafk.app.ui.screens.pets.PetTeamCard
 import com.mgafk.app.ui.screens.shops.ShopsCards
 import com.mgafk.app.ui.screens.status.LiveStatusCard
 import com.mgafk.app.ui.screens.status.WeatherStationCard
+import androidx.compose.material.icons.outlined.Bolt
+import com.mgafk.app.ui.screens.autobuy.AutoBuyCards
 import com.mgafk.app.ui.theme.Accent
 import com.mgafk.app.ui.theme.BgDark
 import com.mgafk.app.ui.theme.StatusConnected
@@ -140,6 +142,7 @@ enum class NavSection(
     STORAGE("Storage", Icons.Outlined.Inventory2, requiresConnection = true),
     GARDEN("Garden", Icons.Outlined.Grass, requiresConnection = true),
     SHOPS("Shops", Icons.Outlined.ShoppingCart, requiresConnection = true),
+    AUTOBUY("Autobuy", Icons.Outlined.Bolt, requiresConnection = true),
     SOCIAL("Social", Icons.Outlined.People),
     ALERTS("Alerts", Icons.Outlined.Notifications),
     SETTINGS("Settings", Icons.Outlined.Settings),
@@ -719,6 +722,15 @@ private fun SectionContent(
                 onDismissTip = { viewModel.dismissShopTip() },
                 onBuy = { shopType, itemName -> viewModel.purchaseShopItem(session.id, shopType, itemName) },
                 onBuyAll = { shopType, itemName -> viewModel.purchaseAllShopItem(session.id, shopType, itemName) },
+            )
+        }
+
+        NavSection.AUTOBUY -> {
+            AutoBuyCards(
+                session = session,
+                apiReady = state.apiReady,
+                autoBuyItems = state.settings.autoBuyItems,
+                onToggle = { key, enabled -> viewModel.toggleAutoBuyItem(key, enabled) },
             )
         }
         NavSection.STORAGE -> {
