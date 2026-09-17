@@ -60,6 +60,9 @@ import com.mgafk.app.data.repository.SessionRepository
 import com.mgafk.app.data.repository.StateCollector
 import com.mgafk.app.data.repository.AppRelease
 import com.mgafk.app.data.repository.VersionFetcher
+import com.mgafk.app.data.repository.ShopItemBuyState
+import com.mgafk.app.data.repository.buyState
+import com.mgafk.app.service.AutoBuyTracker
 import com.mgafk.app.data.websocket.ClientEvent
 import com.mgafk.app.data.websocket.RoomClient
 import com.mgafk.app.service.AfkService
@@ -67,6 +70,7 @@ import com.mgafk.app.service.AfkWatchdogWorker
 import com.mgafk.app.service.AlertNotifier
 import com.mgafk.app.service.AutoStockTracker
 import com.mgafk.app.service.cancelResumeNotification
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -150,6 +154,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     private val repo = SessionRepository(application)
     private val alertNotifier = AlertNotifier(application)
+    private val autoBuyTracker = AutoBuyTracker()
     private val clients = mutableMapOf<String, RoomClient>()
     private val collectorJobs = mutableMapOf<String, Job>()
     /** Reports player state to the backend (online flag + data sync). */
@@ -1977,6 +1982,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         applySettings(newSettings)
     }
 
+    fun toggleAutoBuyItem(key: String, enabled: Boolean) {
+        updateSettings { settings ->
+            val items = settings.autoBuyItems.toMutableSet()
+            if (enabled) items.add(key) else items.remove(key)
+            settings.copy(autoBuyItems = items)
+        }
+    }
+    private fun runAutoBuy(sessionId: String, shops: List<ShopSnapshot>, restockedShopTypes: Set<String>) {
+        val autoBuyKeys = _state.value.settings.autoBuyItems
+        if (autoBuyKeys.isEmpty()) return
+        val actions = clients[sessionId]?.actions ?: return
+        val session = _state.value.sessions.find { it.id == sessionId } ?: return
+
+        val stockedKeys = shops.flatMap { shop ->
+            shop.itemNames
+                .filter { (shop.itemStocks[it] ?: 0) > 0 }
+                .map { name -> AutoBuyTracker.keyOf(shop.type, name) }
+        }
+
+        val toBuy = autoBuyTracker.newlyStocked(stockedKeys, restockedShopTypes) { it in autoBuyKeys }
+        for (key in toBuy) {
+            val parts = key.split(":", limit = 3)
+            if (parts.size < 3) continue
+            val shopType = parts[1]
+            val itemName = parts[2]
+            if (session.buyState(itemName) != ShopItemBuyState.Buyable) continue
+            val stock = shops.find { it.type == shopType }?.itemStocks?.get(itemName) ?: 0
+            repeat(stock) { actions.purchaseShopItem(shopType, itemName) }
+        }
+    }
+
     private fun applySettings(settings: AppSettings) {
         // Push the chosen alarm sound URI to the notifier so the next alarm uses it.
         alertNotifier.alarmSoundUri = settings.alarmSoundUri
@@ -2481,6 +2517,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val newItems = newShops.associate { it.type to it.itemNames }
                 if (oldItems != newItems || restockedTypes.isNotEmpty()) {
                     alertNotifier.checkShopItems(newShops, _state.value.alerts, restockedTypes)
+                    runAutoBuy(sessionId, newShops, restockedTypes)
                 }
             }
             is ClientEvent.ChatChanged -> {
