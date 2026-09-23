@@ -87,6 +87,7 @@ data class AppSettings(
     val retryMaxDelayMs: Long = 60000,
     val retrySupersededDelayMs: Long = 30000,
     val notifyOnDisconnect: Boolean = false,
+    val weatherAutoDisconnectEnabled: Boolean = false,
 
     // Shops
     val purchaseMode: PurchaseMode = PurchaseMode.BULK,
