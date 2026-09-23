@@ -980,6 +980,13 @@ private fun ReconnectionCard(settings: AppSettings, onUpdate: (AppSettings) -> U
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        ToggleRow(
+            title = "Auto-disconnect on Rain/Snow",
+            description = "Disconnect for 10 minutes whenever Rain or Snow starts, then reconnect automatically.",
+            checked = settings.weatherAutoDisconnectEnabled,
+            onCheckedChange = { onUpdate(settings.copy(weatherAutoDisconnectEnabled = it)) },
+        )
+
         SettingRow(
             label = "Kicked by another session",
             description = "Wait time before reconnecting when the same account connects from another device.",
