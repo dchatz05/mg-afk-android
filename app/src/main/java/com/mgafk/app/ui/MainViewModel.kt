@@ -150,7 +150,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         const val ON_CONNECT_COLLECT_RETRY_MS = 1_500L
         /** A shop countdown may tick back up by a hair on its own; only a jump past this is a restock. */
         const val RESTOCK_COUNTDOWN_JITTER_SEC = 30
+
+        val WEATHER_AUTO_DISCONNECT_TYPES = setOf("Rain", "Frost")
+        const val WEATHER_AUTO_DISCONNECT_MS = 10 * 60_000L
     }
+
+    private val weatherPauseJobs = mutableMapOf<String, Job>()
     private val repo = SessionRepository(application)
     private val alertNotifier = AlertNotifier(application)
     private val autoBuyTracker = AutoBuyTracker()
@@ -372,6 +377,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connect(sessionId: String) {
+        weatherPauseJobs.remove(sessionId)?.cancel()
         val session = _state.value.sessions.find { it.id == sessionId } ?: return
         if (session.cookie.isBlank()) return
 
@@ -445,6 +451,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun disconnectInternal(sessionId: String, stopServiceIfIdle: Boolean) {
+        if (stopServiceIfIdle) weatherPauseJobs.remove(sessionId)?.cancel()
         collectorJobs.remove(sessionId)?.cancel()
         stateCollector.reset(sessionId)
         clients[sessionId]?.disconnect()
@@ -1981,6 +1988,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             settings.copy(autoBuyItems = items)
         }
     }
+
+    private fun scheduleWeatherPause(sessionId: String) {
+        if (weatherPauseJobs.containsKey(sessionId)) return
+        disconnectKeepService(sessionId)
+        weatherPauseJobs[sessionId] = viewModelScope.launch {
+            delay(WEATHER_AUTO_DISCONNECT_MS)
+            weatherPauseJobs.remove(sessionId)
+            connect(sessionId)
+        }
+    }
     private fun runAutoBuy(sessionId: String, shops: List<ShopSnapshot>, restockedShopTypes: Set<String>) {
         val autoBuyKeys = _state.value.settings.autoBuyItems
         if (autoBuyKeys.isEmpty()) return
@@ -2168,6 +2185,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val alerts = _state.value.alerts
                 alertNotifier.checkWeather(event.weather, previousWeather, alerts)
                 alertNotifier.checkPetHunger(sessionId, newPets, alerts)
+
+                if (_state.value.settings.weatherAutoDisconnectEnabled && event.weather in WEATHER_AUTO_DISCONNECT_TYPES) {
+                    scheduleWeatherPause(sessionId)
+                }
             }
             is ClientEvent.PetTeamsChanged -> {
                 updateSession(sessionId) { it.copy(petTeams = event.teams) }
