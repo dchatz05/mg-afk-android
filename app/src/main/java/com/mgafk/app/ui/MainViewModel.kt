@@ -2452,6 +2452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val newItems = newShops.associate { it.type to it.itemNames }
                 if (oldItems != newItems || restockedTypes.isNotEmpty()) {
                     alertNotifier.checkShopItems(newShops, _state.value.alerts, restockedTypes)
+                    runAutoBuy(sessionId, newShops, restockedTypes)
                 }
             }
             is ClientEvent.ChatChanged -> {
