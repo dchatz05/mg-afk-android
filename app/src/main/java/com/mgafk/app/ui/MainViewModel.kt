@@ -60,11 +60,14 @@ import com.mgafk.app.data.repository.SessionRepository
 import com.mgafk.app.data.repository.StateCollector
 import com.mgafk.app.data.repository.AppRelease
 import com.mgafk.app.data.repository.VersionFetcher
+import com.mgafk.app.data.repository.ShopItemBuyState
+import com.mgafk.app.data.repository.buyState
 import com.mgafk.app.data.websocket.ClientEvent
 import com.mgafk.app.data.websocket.RoomClient
 import com.mgafk.app.service.AfkService
 import com.mgafk.app.service.AfkWatchdogWorker
 import com.mgafk.app.service.AlertNotifier
+import com.mgafk.app.service.AutoBuyTracker
 import com.mgafk.app.service.AutoStockTracker
 import com.mgafk.app.service.cancelResumeNotification
 import kotlinx.serialization.json.JsonArray
@@ -150,6 +153,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     private val repo = SessionRepository(application)
     private val alertNotifier = AlertNotifier(application)
+    private val autoBuyTracker = AutoBuyTracker()
     private val clients = mutableMapOf<String, RoomClient>()
     private val collectorJobs = mutableMapOf<String, Job>()
     /** Reports player state to the backend (online flag + data sync). */
